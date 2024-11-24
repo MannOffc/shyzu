@@ -197,12 +197,13 @@ module.exports = async (shyzu, m) => {
         try {
         var { data } = await axios({
             "method": "GET",
-            "url": "https://hercai.onrender.com/v3/hercai",
+            "url": "https://mannoffc-x.hf.space/ai/prompt",
             "params": {
-                "question": text
+		"prompt": "Nama kamu adalah shyzu",
+                "message": text
             }
         })
-        m.reply(data.reply)
+        m.reply(data.result)
         } catch ({ message }) {
         m.reply(message)
         }
@@ -213,7 +214,7 @@ module.exports = async (shyzu, m) => {
         if (!text) return m.reply("Masukan teksnya!")
         try {
         let { getObfuscatedCode: res } = JavaScriptObfuscator.obfuscate(text)
-        m.reply(res)
+        return res
         } catch ({ message }) {
         m.reply(message)
         }
@@ -234,30 +235,33 @@ module.exports = async (shyzu, m) => {
         break
         
         case "tiktok": case "tt": {
-        if (!text.includes("tiktok.com")) return m.reply("Masukan link tiktoknya!")
+        if (!text.includes("tiktok.com")) return m.reply("Masukan link tiktok, Contoh *.tt* https://www.tiktok.com/xxxx")
         try {
-        let { get } = axios
-        var { data } = await get({
-            "method": "GET",
-            "url": "https://manaxu-seven.vercel.app/api/downloader/tiktok?url=" + text
+        let { data } = await axios({
+        "method": "GET",
+        "url": "https://mannoffc-x.hf.space/download/tiktok",
+          "params": {
+            "url": text
+          }
         })
-        let { id, region, title, play, duration, play_count, comment_count, share_count, download_count, collect_count, author } = data.result
-        let { nickname } = author
-        var x_ = `┌─⊷ *T I K T O K*`
-        x_ += `\n${xicon} *Author:* ${nickname}`
-        x_ += `\n${xicon} *ID:* ${id}`
-        x_ += `\n${xicon} *Region:* ${region}`
-        x_ += `\n${xicon} *Title:* ${title}`
-        x_ += `\n${xicon} *Duration:* ${duration + " Seconds"}`
-        x_ += `\n${xicon} *Play Count:* ${format(play_count)}`
-        x_ += `\n${xicon} *Comment Count:* ${format(comment_count)}`
-        x_ += `\n${xicon} *Share Count:* ${format(share_count)}`
-        x_ += `\n${xicon} *Download Count:* ${format(download_count)}`
-        x_ += `\n${xicon} *Collect Count:* ${format(collect_count)}`
-        x_ += `\n└──────────`
-        shyzu.sendMessage(m.chat, { video: { url: play }, fileLength: 10630044057600000000000000000000000000000000000000000000000000, caption: x_ }, { quoted: m })
+        let { author, title, duration, medias } = data.result;
+        let { url } = medias[1]
+        let caption = `*T I K T O K • D O W N L O A D E R*\n• Author: ${author}\n• Title: ${title}\n• Duration: ${duration}s`
+        shyzu.sendMessage(m.chat, { video: { url }, caption }, { quoted: m })
         } catch ({ message }) {
         m.reply(message)
+        }
+        }
+        break
+
+	case "facebook": case "fb": {
+        if (!text.includes("facebook.com")) return m.reply("Masukan link facebook, Contoh *.fb* https://www.facebook.com/xxxx")
+        try {
+        axios({ "method": "GET", "url": "https://mannoffc-x.hf.space/download/facebook", "params": { "url": text }}).then(_ => {
+        shyzu.sendMessage(m.chat, { video: { url: _.data.result.video }, caption: "Ini dia kak" }, { quoted: m })
+        })
+        } catch ({ message }) {
+        return m.reply(message)
         }
         }
         break
@@ -399,7 +403,7 @@ module.exports = async (shyzu, m) => {
         case "stc": {
         if (!text) return m.reply("Masukan teks, Contoh *.stc* kmu knp sih?")
         try {
-        let data = "https://mxmxk-helper.hf.space/brat?text=" + text
+        let data = "https://mannoffc-x.hf.space/brat?q=" + text
         shyzu.sendImageAsSticker(m.chat, data, m, { packname: "Created by Shyzu", author: m.pushName })
         } catch ({ message }) {
         return m.reply(message)
