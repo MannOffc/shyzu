@@ -20,9 +20,9 @@
     "type": "git",
     "url": "git+https://github.com/MannOffc/shyzu.git"
   },
-  "license": "GNU",
+  "license": "GPL",
   "dependencies": {
-    "@whiskeysockets/baileys": "github:nstar-y/Bail",
+    "@whiskeysockets/baileys": "^6.6.0",
     "async": "^3.2.1",
     "awesome-phonenumber": "^2.66.0",
     "axios": "^0.24.0",
