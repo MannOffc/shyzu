@@ -2,10 +2,11 @@
   * Base Ori Created By MannR
   * Name Script : Shyzu
   * Creator Script : MannR
-  * Version Script : 1.0.0
+  * Version Script : 1.2.5
   * Libary : @whiskeysockets/baileys
   * Version Libary : ^6.6.0
   * Created on Sunday, Sep 1, 2024
+  * Updated on Sunday, Dec 15, 2024
   * Thank you to MannR and the module providers and those who use this base.
   * Please use this base as best as possible and do not delete the copyright.
   * © MannR 2024
@@ -93,6 +94,9 @@ module.exports = async (shyzu, m) => {
     
     const participants = isGroup ? groupMetadata.participants : '';
     const groupName = isGroup ? groupMetadata.subject : '';
+    const groupAdmins = m.isGroup ? await participants.filter(v => v.admin !== null).map(v => v.id) : '';
+    const isBotAdmins = m.isGroup ? groupAdmins.includes(shyzu.user.jid) : false
+    const isAdmins = m.isGroup ? groupAdmins.includes(m.sender) : false
 
     let mType = Object.keys(message)[0];
     let body = (mType === 'conversation' && message.conversation) ? message.conversation :
@@ -105,11 +109,12 @@ module.exports = async (shyzu, m) => {
                (mType === 'messageContextInfo') ? (message.buttonsResponseMessage?.selectedButtonId || message.listResponseMessage?.singleSelectReply.selectedRowId || message.text) :
                (mType === 'documentMessage' && message.documentMessage.caption) ? message.documentMessage.caption : '';
 
-    const prefix = ['.', ',', '!', '?', '#'];
-    if (!prefix.some(p => body.startsWith(p))) return;
-    const [command, ...args] = body.slice(prefix.find(p => body.startsWith(p)).length).trim().split(/ +/);
+    const prefix = ['.', ',', '!', '?', '#', ''];
+    const args = body.trim().split(/ +/).slice(1);
     const text = args.join(' ');
-    const budy = (typeof text == 'string' ? text : '')
+    if (!prefix.some(p => body.startsWith(p))) return;
+    if (m.fromMe) return;
+    const [command] = body.slice(prefix.find(p => body.startsWith(p)).length).trim().split(/ +/);
     
     var cmd = prefix + command
 
@@ -119,7 +124,7 @@ module.exports = async (shyzu, m) => {
     x += chalk.cyan("\nᕐ⁠ᐷ From: ")
     x += chalk.bold.white(isSender)
     x += chalk.cyan("\nᕐ⁠ᐷ Command: ")
-    x += chalk.bold.white("." + command + " " + text)
+    x += chalk.bold.white(command + " " + text)
     console.log(x)
     
     m.reply = async (text) => {
@@ -191,22 +196,60 @@ module.exports = async (shyzu, m) => {
     }
     }
     
-    switch (command) {
-        case "ai": {
-        if (!text) return m.reply("Masukan pertanyaan!")
+    const sendPlay = async (text) => {
+        if (!text) return m.reply("Masukan judul!")
+        try {
+        let { data } = await axios({
+            "method": "GET",
+            "url": "https://mannoffc-x.hf.space/search/spotify",
+            "params": { "s": text }
+        })
+        let { name, artists, link, image, duration_ms } = data.result[0]
+        let { data: _data } = await axios({
+            "method": "GET",
+            "url": "https://mannoffc-x.hf.space/download/spotify",
+            "params": { "url": link }
+        })
+        let { download } = _data.result
+        let resText = `• *Name:* ${name}\n• *Artist:* ${artists}\n• *Duration:* ${duration_ms}ms`
+        let qq = await shyzu.sendMessage(m.chat, { image: { url: image }, caption: resText }, { quoted: m })
+        shyzu.sendMessage(m.chat, { audio: { url: download }, mimetype: "audio/mpeg" }, { quoted: qq })
+        } catch (e) {
+        console.log(e)
+        m.reply(e.message)
+        }
+    }
+    
+    const sendTxt2img = async (text) => {
+        if (!text) return m.reply("Masukan teks!")
         try {
         var { data } = await axios({
             "method": "GET",
-            "url": "https://mannoffc-x.hf.space/ai/prompt",
-            "params": {
-		"prompt": "Nama kamu adalah shyzu",
-                "message": text
-            }
+            "url": "https://hercai.onrender.com/v3/text2image",
+            "params": { "prompt": text }
         })
-        m.reply(data.result)
-        } catch ({ message }) {
-        m.reply(message)
+        shyzu.sendMessage(m.chat, {
+        image: { url: data.url }
+        }, { quoted: m })
+        } catch (e) {
+        m.reply(e.message)
+        console.log(e)
         }
+    }
+    
+    switch (command) {
+
+        case "ai": {
+            //if (!text) return m.reply(`Contoh *.ai* <on/off>`)
+            if (text == "off") {
+                delete shyzu.ai_sessions[m.sender]
+                m.reply("[ ✓ ] Success delete session chat")
+            } else if (shyzu.ai_sessions[m.sender]) {
+                m.reply("[ ! ] Ai sudah aktif lohhh kak..!!!")
+            } else {
+                shyzu.ai_sessions[m.sender] = { messages: [] }
+                m.reply("[ ✓ ] Success create session chat\n> Ketik *.ai* off atau *matikan ai* untuk menghapus sessions chat.")
+            }
         }
         break
         
@@ -254,7 +297,7 @@ module.exports = async (shyzu, m) => {
         }
         break
 
-	case "facebook": case "fb": {
+	    case "facebook": case "fb": {
         if (!text.includes("facebook.com")) return m.reply("Masukan link facebook, Contoh *.fb* https://www.facebook.com/xxxx")
         try {
         axios({ "method": "GET", "url": "https://mannoffc-x.hf.space/download/facebook", "params": { "url": text }}).then(_ => {
@@ -284,9 +327,13 @@ module.exports = async (shyzu, m) => {
         if (!message) return m.reply("Masukan messagenya, Contoh *.ngl* mann|halo")
         try {
         await axios({
-            method: "GET",
-            url: "https://api-nodex.vercel.app",
-            params: {
+            method: "POST",
+            url: "https://api.manaxu.my.id/api/tools/ngl",
+            headers: {
+              "x-api-key": "key-manaxu-free",
+              "Content-Type": "application/json"
+            },
+            data: {
                 username,
                 message
             }
@@ -325,21 +372,6 @@ module.exports = async (shyzu, m) => {
         }
         }
         break
-        
-        /** case "auto-ai": {
-        if (!auto_ai) {
-        shyzu.auto_ai = shyzu.auto_ai ? shyzu.auto_ai : {};
-        shyzu.auto_ai[isSender] = {
-            status: true
-        }
-        m.reply("Mengaktifkan auto ai")
-        m.reply("Jika ingin menonaktifkannya silahkan ketik *.auto-ai* sekali lagi")
-        } else {
-        delete shyzu.auto_ai[isSender]
-        m.reply("Menonaktifkan auto ai")
-        }
-        }
-        break **/
         
         case "soundcloud": {
         if (!text) return m.reply("Masukan judulnya, Contoh *.soundcloud* dear god");
@@ -400,13 +432,101 @@ module.exports = async (shyzu, m) => {
         }
         break
         
-        case "stc": {
-        if (!text) return m.reply("Masukan teks, Contoh *.stc* kmu knp sih?")
+        case "brat": {
+        if (!text) return m.reply("Masukan teks, Contoh *.brat* kmu knp sih?")
         try {
         let data = "https://mannoffc-x.hf.space/brat?q=" + text
-        shyzu.sendImageAsSticker(m.chat, data, m, { packname: "Created by Shyzu", author: m.pushName })
+        shyzu.sendImageAsSticker(m.chat, data, { pack: "Created by Shyzu", author: m.pushName, type: "full" })
         } catch ({ message }) {
         return m.reply(message)
+        }
+        }
+        break
+        
+        case "videy": {
+        if (!text.includes("videy.com")) return m.reply("Mana linknya?")
+        try {
+        let cap = `Menonton video porno itu bahaya, guys! 😤 Bisa bikin hati kita kotor dan jauh dari Allah. Dalam Al-Qur'an Surah Al-Mu'minun ayat 5-7, Allah bilang, "Dan mereka yang menjaga kemaluannya, kecuali terhadap istri-istri mereka..." Jadi, lebih baik fokus ke hal yang positif dan menjaga diri dari yang haram! 😇`
+        let { data } = await axios({
+            "method": "GET",
+            "url": "https://mannoffc-x.hf.space/download/videy",
+            "params": { "url": text }
+        })
+        let s = await shyzu.sendMessage(m.chat, { video: { url: data.result }}, { quoted: m })
+        shyzu.sendMessage(m.chat, { text: cap }, { quoted: s })
+        } catch (e) {
+        m.reply("Terdapat kesalahan: " + e.message)
+        console.log(e)
+        }
+        }
+        break;
+
+        case "play": {
+        await sendPlay(text);
+        }
+        break;
+        
+        case "hitungwr": {
+        if (!text) return m.reply("Contoh *.hitungwr* 650 58 89")
+        let [tm, tw, mw] = text.split(" ")
+        if (isNaN(tm)) return m.reply("Masukan total Match")
+        if (isNaN(tw)) return m.reply("Masukan total Winrate")
+        if (isNaN(mw)) return m.reply("Masukan tujuan Winrate")
+        try {
+        const TotalMatch = tm
+        const TotalWr = tw
+        const MauWr = mw
+
+        function result() {
+        if (MauWr === 100) {
+        m.reply("Mana bisalahh 100% 😂");
+        }
+        const resultNum = rumus(TotalMatch, TotalWr, MauWr);
+        const x = `Kamu memerlukan sekitar ${resultNum} win tanpa lose untuk mendapatkan win rate ${MauWr}%`;
+        m.reply(x)
+        }
+
+        function rumus(TotalMatch, TotalWr, MauWr) {
+        let tWin = TotalMatch * (TotalWr / 100);
+        let tLose = TotalMatch - tWin;
+        let sisaWr = 100 - MauWr;
+        let wrResult = 100 / sisaWr;
+        let seratusPersen = tLose * wrResult;
+        let final = seratusPersen - TotalMatch;
+        return Math.round(final);
+        }
+        result()
+        } catch (e) {
+        console.log(e)
+        }
+        }
+        break
+        
+        case "txt2img": {
+        await sendTxt2img(text);
+        }
+        break
+        
+        case "myip": {
+        if (!isOwner) return m.reply("Khusus owner hehe :3")
+        try {
+        var { ip } = (await axios.get("https://api.ipify.org/?format=json")).data
+        m.reply("IP: " + ip)
+        } catch (e) {
+        console.log(e)
+        m.reply(e.message)
+        }
+        }
+        break;
+        
+        case "s": case "sticker": case "stiker": {
+        let q = m.quoted ? m.quoted : m
+        let mime = (q.msg || q).mimetype || ''
+        if (/image/.test(mime)) {
+        let media = await q.download()
+        shyzu.sendImageAsSticker(m.chat, media, m, { pack: "cobalagidanlagi", type: "full" })
+        } else {
+        m.reply("Balas sebuah gambar (ga support video) dengan *.s*")
         }
         }
         break
@@ -414,7 +534,7 @@ module.exports = async (shyzu, m) => {
         case "menu": {
         try {
         let { id, name } = await shyzu.user
-        let c = "_Hello i'm Shyzu simple WhatsApp bot created by MannR. I can to do something, search, get data and information only through WhatsApp._\n\n`失敗がすべての終わりじゃない、立ち直って、人生は一度きり、絶対に諦めない、絶対に諦めない人になろう`\n\n> *(__> ALL CMD <__)*\n> [ • ] .ai\n> [ • ] .clock\n> [ • ] .enc\n> [ • ] .exec\n> [ • ] .getpp\n> [ • ] .menu\n> [ • ] .ngl\n> [ • ] .soundcloud\n> [ • ] .stc\n> [ • ] .tiktok\n> [ • ] .toptv\n\n_© MannR - 2024_"
+        let c = "_Hello i'm Shyzu simple WhatsApp bot created by MannR. I can to do something, search, get data and information only through WhatsApp._\n\n`失敗がすべての終わりじゃない、立ち直って、人生は一度きり、絶対に諦めない、絶対に諦めない人になろう`\n\n> *(__> ALL CMD <__)*\n> [ • ] .ai\n> [ • ] .brat\n> [ • ] .clock\n> [ • ] .enc\n> [ • ] .exec\n> [ • ] .getpp\n> [ • ] .hitungwr\n> [ • ] .menu\n> [ • ] .myip\n> [ • ] .ngl\n> [ • ] .play\n> [ • ] .soundcloud\n> [ • ] .sticker\n> [ • ] .tiktok\n> [ • ] .toptv\n> [ • ] .txt2img\n> [ • ] .videy\n\n_© MannR - 2024_"
         let z = await shyzu.profilePictureUrl(id, "image")
         shyzu.sendMessage(m.chat, { text: c, contextInfo: {
         forwardingScore: 0,
@@ -440,19 +560,66 @@ module.exports = async (shyzu, m) => {
         }
         break
         default:
-        /** if (!shyzu.auto_ai[isSender].status) return
-        try {
-        var { data } = await axios({
-            "method": "GET",
-            "url": "https://hercai.onrender.com/v3/hercai",
-            "params": {
-                "question": text
-            }
+        let xtx = m.text.slice(0)
+        if (shyzu.ai_sessions[m.sender] && xtx) {
+        if (xtx.startsWith("gambarkan")) {
+        sendTxt2img(xtx.slice(9))
+        } else if (xtx.includes("buka grup")) {
+        if (!isGroup) return m.reply("Hmm cuma bisa digrup")
+        if (!isBotAdmins) return m.reply("Jadikan bot sebagai Admin grup")
+        if (!isAdmins) return m.reply("Khusus Admin")
+        shyzu.groupSettingsUpdate(m.chat, "announcement")
+        } else if (xtx.includes("tutup grup")) {
+        if (!isGroup) return m.reply("Hmm cuma bisa digrup")
+        if (!isBotAdmins) return m.reply("Jadikan bot sebagai Admin grup")
+        if (!isAdmins) return m.reply("Khusus Admin")
+        shyzu.groupSettingsUpdate(m.chat, "not_announcement")
+        } else if (xtx.startsWith("putarkan")) {
+        sendPlay(xtx.slice(8))
+        } else if (xtx.includes("matikan ai")) {
+        delete shyzu.ai_sessions[m.sender]
+        m.reply("[ ✓ ] Success delete session chat")
+        } else {
+        const senderId = m.sender;
+        const aiSessions = shyzu.ai_sessions
+
+        const msgs = [
+        ...aiSessions[senderId].messages,
+        { content: xtx, role: "user" }
+        ];
+
+        const api_url = 'https://api.manaxu.my.id/api/ai';
+        const api_key = 'key-manaxu-free';
+
+        axios({
+        method: 'POST',
+        url: api_url,
+        headers: {
+           'x-api-key': api_key,
+           'Content-Type': 'application/json'
+        },
+        data: {
+            logic: 'nama kamu adalah Shyzu, assistent AI cerdas buatan MannR.',
+            messages: msgs
+        }
         })
-        m.reply(data.reply)
-        } catch ({ message }) {
-        return m.reply(message)
-        } **/
+        .then(response => {
+        if (response.status === 200) {
+        const { result } = response.data;
+        m.reply(result ?? "Hmmm sepertinya terjadi kesalahan pada API, Minta bantuan ke owner ya.");
+        aiSessions[senderId].messages.push({ content: xtx, role: "user" });
+        aiSessions[senderId].messages.push({ content: result, role: "assistant" });
+        shyzu.ai_sessions = aiSessions;
+        } else {
+        m.reply("Hmmm sepertinya terjadi kesalahan pada API, Minta bantuan ke owner ya.");
+        }
+        })
+        .catch(error => {
+        console.error(error);
+        m.reply("Hmmm sepertinya terjadi kesalahan, Minta bantuan ke owner ya.");
+        });
+        }
+        }
     }
     } catch ({ message }) {
     console.log(chalk.redBright(message))
