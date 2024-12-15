@@ -2,20 +2,22 @@
   * Base Ori Created By MannR
   * Name Script : Shyzu
   * Creator Script : MannR
-  * Version Script : 1.0.0
+  * Version Script : 1.2.5
   * Libary : @whiskeysockets/baileys
   * Version Libary : ^6.6.0
   * Created on Sunday, Sep 1, 2024
+  * Updated on Sunday, Dec 15, 2024
   * Thank you to MannR and the module providers and those who use this base.
   * Please use this base as best as possible and do not delete the copyright.
   * © MannR 2024
 **/
 
 require('./lib/config.js')
-var { Boom } = require('@hapi/boom')
-var { baileys, chalk, fs, pino, readline, process, PhoneNumber } = require("./lib/module")
+const { Boom } = require('@hapi/boom')
+const { baileys, chalk, fs, pino, readline, process, PhoneNumber } = require("./lib/module");
 const { default: makeConnectionShyzu, DisconnectReason, useMultiFileAuthState, makeInMemoryStore, jidDecode, generateForwardMessageContent, downloadContentFromMessage, generateWAMessageFromContent, proto } = baileys
 const CFonts = require('cfonts');
+const { Sticker } = require("wa-sticker-formatter");
 
 let useOfPairing = true
 
@@ -52,6 +54,8 @@ async function whatsappConnect() {
     shyzu.demote = "Yahh @user didemote"
     
     shyzu.public = true
+    
+    shyzu.ai_sessions = shyzu.ai_sessions ? shyzu.ai_sessions : {};
     
     shyzu.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
@@ -141,8 +145,6 @@ async function whatsappConnect() {
     });
     
     
-    shyzu.public = false
-    
     shyzu.ev.on('creds.update', await saveCreds);
     
     shyzu.decodeJid = (jid) => {
@@ -151,6 +153,12 @@ async function whatsappConnect() {
         let decode = jidDecode(jid) || {}
         return decode.user && decode.server && decode.user + '@' + decode.server || jid
     } else return jid
+    }
+    
+    shyzu.sendImageAsSticker = async (jid, imageBuffer, yaya) => {
+    const sticker = new Sticker(imageBuffer, yaya)
+    const stickerBuffer = await sticker.toBuffer()
+    shyzu.sendMessage(jid, { sticker: stickerBuffer })
     }
     
     shyzu.downloadMediaMessage = async (message) => {
